@@ -1,0 +1,149 @@
+---
+title: "Take Home Project"
+author: "Victor Yoolim Jin"
+date: '2017 4 13 '
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r, echo = FALSE}
+setwd("~/Desktop/Intercom Data Exercise")
+dat <- read.csv(file = "movies_data.csv", header = TRUE)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+```
+
+# Intro
+The two main factors for a successful movie by the given data are 1) distribution of ratings, and 2) distribution of votes. Some key assumptiongs are:  
+- Distribution of votes can loosely be interpreted as the total number of people that saw the movie, which is what I'll use as a metric for the total # of views of a single movie.  
+- Because the votes have outrageous outliers across the genres, we will disregard the mean and only consider the median as our metric.  
+
+
+Both votes and ratings are important, but it's common to make the mistake of choosing a genre that has high ratings but has low votes (and thereby low revenue), or to take into account movies that has low ratings, but a higher view (which could potentially hurt the reputation for the movie series and the company).  
+
+# Analysis
+We first assess the correlation between the average ratings and the number of views.  
+```{r, echo = FALSE}
+attach(dat)
+cor(rating, votes)
+par(mfrow = c(1, 2))
+plot(rating, votes)
+plot(rating, log(votes))
+```
+There's not much of a correlation, nor a cleanly defined distribution.
+We now move on to exploring other possible relationships. Below are data based on different genres. For simplicity purposes, we create a new data frame where it has only 1 genre, and another helper column from that data frame that can help aggregate the mean ratings and votes for each.  
+
+```{r, echo = FALSE}
+dat$genreCounts <- apply(dat[, 19:25], 1, sum)
+
+dat1 = melt(dat, id.vars = c('X', 'year', 'rating', 'length', 'votes'),
+            measure.vars = names(dat[, 19:25]))
+dat1$year <- as.factor(dat1$year)
+dat1 <- dat1[which(dat1$value ==  1),]
+o0 <- ggplot(dat1) +
+  geom_boxplot(aes(x=variable, y=rating))
+
+o1 <- ggplot(dat1) + geom_boxplot(aes(x=variable, y=votes), outlier.shape = NA)
+ylim.val = boxplot.stats(dat1$votes)$stat[c(1, 5)]
+o1 <- o1 + coord_cartesian(ylim = ylim.val*4)
+
+grid.arrange(o0, o1, nrow = 2)
+```
+The mean value of ratings are highest for Documentaries. But what about votes? Since votes tend to have many outliers, we first try to remove the outliers from the sample to get a general view of the voting distribution per genre.  
+We can see that Romance genre historically has the highest votes, followed closely by Action. But another thing to consider is whether there is a seasonal trend in these genres. To generalize with the given data, we look into the box distribution of each genre per year to identify possible seasonalities or overall trends.
+```{r subsets, echo = FALSE}
+dat1.act <- dat1[which(dat1$variable == "Action"),]
+dat1.ani <- dat1[which(dat1$variable == "Animation"),]
+dat1.com <- dat1[which(dat1$variable == "Comedy"),]
+dat1.dra <- dat1[which(dat1$variable == "Drama"),]
+dat1.doc <- dat1[which(dat1$variable == "Documentary"),]
+dat1.rom <- dat1[which(dat1$variable == "Romance"),]
+dat1.sho <- dat1[which(dat1$variable == "Short"),]
+```
+
+
+```{r plots, echo = FALSE}
+p1 <- ggplot(dat1.act) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Action") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p2 <- ggplot(dat1.ani) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Animation") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p3 <- ggplot(dat1.com) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Comedy") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p4 <- ggplot(dat1.dra) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Drama") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p5 <- ggplot(dat1.doc) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Documentary") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p6 <- ggplot(dat1.rom) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Romance") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+p7 <- ggplot(dat1.sho) + geom_boxplot(aes(x = year, y = rating)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Short") + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = rating), colour = "red")
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, ncol = 2)
+```
+The red line indicate the trend in median, and we have a sense of volatility in the data by considering the height of the boxes on each year. We can see that Romance has the most stability in terms of ratings.
+
+```{r, echo = FALSE}
+q1 <- ggplot(dat1.act) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Action") +
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+q2 <- ggplot(dat1.ani) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Animation") +
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+q3 <- ggplot(dat1.com) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Comedy") + 
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red") 
+q4 <- ggplot(dat1.dra) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Drama") + 
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+q5 <- ggplot(dat1.doc) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Documentary") + 
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+q6 <- ggplot(dat1.rom) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Romance") + 
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+q7 <- ggplot(dat1.sho) + geom_boxplot(aes(x = year, y = votes)) + 
+  theme(axis.text.x = element_blank()) + ggtitle("Short") + 
+  coord_cartesian(ylim = ylim.val*4) + 
+  stat_summary(fun.y=median, geom="line", 
+               aes(group = 1, x = year, y = votes), colour = "red")
+
+grid.arrange(q1, q2, q3, q4, q5, q6, q7, ncol = 2)
+```
+There seems to be no seasonal trend except in the 1950~2000s when the overall consumption of movie seems to spike up. The recent votes have overall decreased across most genres. However, one possible explanation might be because the votes are cumulative data, the older movies or movies from 1950~2000s have accumulated all votes from IMDB's active review users, whereas the later movies are still not seen by everyone and thus need time for the full votes to be registered. With this assumption, we can pick Action and Romance as the two genres that are promising since it shows the most increase in popularity.
+
+# Conclusion
+Because we think Romance has the most stability and consistency in high ratings, and Action and Romance shows the most increase in popularity over the years, I'd recommend our next movie to be a Romance genre.
+
+
+# Notes & Thoughts
+Improvements: Some examples of lurking variables which could cloud the true relationship and bias our result could be marketing strategies and budget, when during the year a particular genre was published, whether it's a movie that's a remake or a part of a series that guarantees a certain # of viewers, etc.  
+Also, a way to validate how long it takes for votes to be populated enough for a consistent data is to look into snapshots of votes in time.
